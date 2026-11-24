@@ -280,13 +280,28 @@ let data;
 try{data=JSON.parse(localStorage.getItem(key))}catch(e){}
 const snapshot=()=>({dog:structuredClone(state.dog||{}),weights:structuredClone(state.weights||[]),meals:structuredClone(state.meals||[]),walks:structuredClone(state.walks||[]),vets:structuredClone(state.vets||[]),activities:structuredClone(state.activities||[]),vetKcal:state.vetKcal||null});
 if(!data||!Array.isArray(data.dogs)||!data.dogs.length){data={active:0,dogs:[snapshot()]};}
+if(data.dogs.length>1){
+ const meaningful=d=>Boolean(d?.dog?.name||d?.dog?.weight||(d?.meals||[]).length||(d?.weights||[]).length||(d?.walks||[]).length||(d?.vets||[]).length);
+ if(data.dogs.some(meaningful)){
+   const old=data.dogs;let activeOld=old[data.active];data.dogs=old.filter(meaningful);
+   data.active=Math.max(0,data.dogs.indexOf(activeOld));
+ }
+}
 const save=()=>{data.dogs[data.active]=snapshot();try{localStorage.setItem(key,JSON.stringify(data))}catch(e){console.error(e)}};
 function swap(i){
+ if(i===data.active)return;
  save();data.active=i;
  const d=data.dogs[i];
  for(const k of ['dog','weights','meals','walks','vets','activities'])state[k]=structuredClone(d[k]||(k==='dog'?{}:[]));
  state.vetKcal=d.vetKcal||null;state.walkStart=null;
- persist();loadProfile();render();paintDogs();paintActivity();
+ persist();resetProfileForm();loadProfile();render();paintDogs();paintActivity();
+}
+function resetProfileForm(){
+ for(const id of ['dogName','dogWeight','dogBirth','dogBreedOther'])if($(id))$(id).value='';
+ for(const [id,v] of [['dogAge','adult'],['dogActivity','moderate'],['dogSex',''],['dogNeuter',''],['dogGoal','maintain'],['dogBcs','']])if($(id))$(id).value=v;
+ if($('photo'))$('photo').value='';
+ if($('dogBreed'))$('dogBreed').selectedIndex=0;
+ if($('dogBreedOther'))$('dogBreedOther').style.display='none';
 }
 function paintDogs(){
  const root=$('dogSwitcher');if(!root)return;
@@ -297,14 +312,16 @@ function paintDogs(){
   data.active=data.dogs.length-1;
   for(const k of ['dog','weights','meals','walks','vets','activities'])state[k]=k==='dog'?{}:[];
   state.vetKcal=null;state.walkStart=null;persist();
-  for(const id of ['dogName','dogWeight','dogBirth','dogBreedOther'])if($(id))$(id).value='';
-  for(const [id,v] of [['dogAge','adult'],['dogActivity','moderate'],['dogSex',''],['dogNeuter',''],['dogGoal','maintain']])if($(id))$(id).value=v;
-  if($('photo'))$('photo').value='';
+  resetProfileForm();
   render();paintDogs();paintActivity();go('profile');$('dogName').focus();save();
  };
 }
 // The base saveProfile handler is retained, but a capturing listener synchronizes multi-dog state afterward.
-$('saveProfile').addEventListener('click',()=>{setTimeout(()=>{save();paintDogs();render()},0)});
+const originalSaveProfile=$('saveProfile').onclick;
+$('saveProfile').onclick=()=>{
+ originalSaveProfile();
+ if((state.dog?.name||'').trim() && Number(state.dog?.weight)>0){save();paintDogs();render();}
+};
 // Sync meal edits and additions with active dog without touching other dogs' records.
 $('mealCalculator').addEventListener('input',()=>setTimeout(save,0));
 $('mealCalculator').addEventListener('change',()=>setTimeout(save,0));
@@ -342,7 +359,7 @@ function paintBalanceNote(){
 if(!Array.isArray(state.activities))state.activities=[];
 const previous=window.render;
 if(typeof previous==='function')window.render=function(){previous();paintBalanceNote()};
-if(data.active>0){const d=data.dogs[data.active];for(const k of ['dog','weights','meals','walks','vets','activities'])state[k]=structuredClone(d[k]||(k==='dog'?{}:[]));state.vetKcal=d.vetKcal||null;persist();loadProfile();render()}paintDogs();paintActivity();save();
+if(data.dogs.length){const d=data.dogs[data.active];for(const k of ['dog','weights','meals','walks','vets','activities'])state[k]=structuredClone(d[k]||(k==='dog'?{}:[]));state.vetKcal=d.vetKcal||null;persist();resetProfileForm();loadProfile();render()}paintDogs();paintActivity();save();
 })();</script><script>
 (function(){
  const sources='<a href="https://www.msdvetmanual.com/multimedia/table/daily-maintenance-energy-requirements-for-dogs-and-cats" target="_blank" rel="noopener noreferrer">MSD Veterinary Manual — Daily Maintenance Energy Requirements</a> oraz <a href="https://www.aaha.org/resources/2021-aaha-nutrition-and-weight-management-guidelines/weight-reduction-in-the-obese-pet/" target="_blank" rel="noopener noreferrer">AAHA — Nutrition and Weight Management Guidelines (2021)</a>';
@@ -373,4 +390,4 @@ if(data.active>0){const d=data.dogs[data.active];for(const k of ['dog','weights'
  document.querySelectorAll('[data-page]').forEach(b=>b.addEventListener('click',()=>setTimeout(paint,10)));
  paint();
 })();
-</script></body></html>
+</script><div id="buildFixLabel" style="position:fixed;right:8px;bottom:94px;z-index:9999;font:11px system-ui;background:#e6eee5;color:#315c45;padding:5px 9px;border-radius:15px;opacity:.85">PsiaApka · poprawka profili 9</div></body></html>
